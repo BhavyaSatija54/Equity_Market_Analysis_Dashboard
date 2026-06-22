@@ -1,0 +1,41 @@
+version: "3.9"
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runtime
+    container_name: equity_api
+    ports:
+      - "8000:8000"
+    environment:
+      - ENVIRONMENT=production
+      - EQUITY_DATA_PATH=/app/data/raw
+      - OUTPUT_PATH=/app/data/output
+      - REPORT_PATH=/app/data/reports
+      - LOG_LEVEL=INFO
+    volumes:
+      - ./data:/app/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    restart: unless-stopped
+
+  data-gen:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runtime
+    container_name: equity_data_gen
+    command: python data/sample_generator.py --n-equities 500 --years 5
+    volumes:
+      - ./data:/app/data
+    profiles:
+      - setup                # only runs when: docker-compose --profile setup up data-gen
+
+volumes:
+  data:
