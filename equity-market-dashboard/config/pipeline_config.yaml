@@ -1,0 +1,149 @@
+app:
+  name: "Equity Market Analytics Platform"
+  version: "2.0.0"
+  environment: ${ENVIRONMENT:local}   # local | databricks | production
+
+# ─────────────────────────────────────────────────────────────
+# Medallion layer paths (Bronze → Silver → Gold → Export)
+# ─────────────────────────────────────────────────────────────
+paths:
+  raw:          ${RAW_DATA_PATH:data/raw}          # Yahoo Finance downloads
+  bronze:       ${BRONZE_PATH:data/bronze}         # Schema-enforced, deduplicated
+  silver:       ${SILVER_PATH:data/silver}         # Cleansed + feature-engineered
+  gold:         ${GOLD_PATH:data/gold}             # BI-aggregated, scenario-labelled
+  powerbi:      ${POWERBI_PATH:data/powerbi}       # DirectQuery facts + Import dims
+  checkpoints:  data/.checkpoints                  # Pipeline stage markers
+  reports:      data/reports                       # HTML / Excel output
+  logs:         data/logs
+
+# ─────────────────────────────────────────────────────────────
+# Data Quality Engine (DataQualityEngine config)
+# ─────────────────────────────────────────────────────────────
+quality:
+  null_threshold_pct:    0.01      # >1% nulls per column → FAIL
+  price_move_limit_pct:  0.50      # >50% 1-day move → circuit breaker (WARN)
+  freshness_hours:       48        # Data older than 48h → WARN
+  min_rows:              100       # Fewer than 100 rows → FAIL
+  strict_mode:           true      # true = pipeline aborts on FAIL
+
+  required_columns:
+    - ticker
+    - date
+    - close
+    - daily_return
+
+  numeric_range_checks:
+    close:          [0.01, 1000000]
+    open:           [0.01, 1000000]
+    high:           [0.01, 1000000]
+    low:            [0.01, 1000000]
+    volume:         [0,    1000000000000]
+
+# ─────────────────────────────────────────────────────────────
+# Pipeline execution parameters
+# ─────────────────────────────────────────────────────────────
+pipeline:
+  n_tickers:          503            # S&P 500 full universe
+  history_years:      20             # 20 years of Yahoo Finance data
+  batch_size:         50             # yfinance download batch size
+  min_trading_days:   252            # Liquidity filter: drop tickers with < 1Y data
+  force_recompute:    false          # Ignore checkpoints and rerun all stages
+
+# ─────────────────────────────────────────────────────────────
+# Bronze layer
+# ─────────────────────────────────────────────────────────────
+bronze:
+  partition_by:       sector         # Partition key for Parquet writes
+  dedup_keys:         [ticker, date]
+  source:             yahoo_finance
+  lineage_columns:
+    - _bronze_loaded_at
+    - _source
+
+# ─────────────────────────────────────────────────────────────
+# Silver layer
+# ─────────────────────────────────────────────────────────────
+silver:
+  # Cleanse
+  ohlc_tolerance:     0.001          # Allow 0.1% OHLC inconsistency (rounding)
+  outlier_flag_threshold: 0.50       # Flag (not drop) moves > 50%
+
+  # Features
+  sma_windows:        [20, 50, 200]
+  ema_windows:        [12, 26]
+  rsi_period:         14
+  macd_fast:          12
+  macd_slow:          26
+  macd_signal:        9
+  vol_windows:        [20, 60]
+  momentum_windows:   [20, 60, 252]
+  bollinger_window:   20
+  bollinger_std:      2.0
+
+# ─────────────────────────────────────────────────────────────
+# Gold layer
+# ─────────────────────────────────────────────────────────────
+gold:
+  fact_partition_by:  [year, quarter]  # For Power BI DirectQuery pruning
+  scenario_config:    config/scenario_config.yaml
+
+  # Composite signal score weights
+  signal_weights:
+    momentum_12m:     0.40
+    rsi_contrarian:   0.20
+    volatility:       0.20
+    value_pe:         0.20
+
+# ─────────────────────────────────────────────────────────────
+# Scenario / Risk Engine
+# ─────────────────────────────────────────────────────────────
+analytics:
+  risk_free_rate:           0.05        # Annualised
+  trading_days_per_year:    252
+  var_confidence_levels:    [0.90, 0.95, 0.99]
+  rolling_windows:          [20, 60, 120, 252]
+
+# ─────────────────────────────────────────────────────────────
+# Export / Power BI
+# ─────────────────────────────────────────────────────────────
+export:
+  powerbi:
+    fact_storage_mode:   DirectQuery     # year/quarter partitioned
+    dim_storage_mode:    Import
+    generate_dax_lib:    true
+    generate_semantic_model: true
+
+  formats:    [parquet, csv]
+  reporting:  [html, excel]
+
+# ─────────────────────────────────────────────────────────────
+# Spark (Databricks / local PySpark)
+# ─────────────────────────────────────────────────────────────
+spark:
+  app_name:             "EquityMarketAnalytics"
+  master:               ${SPARK_MASTER:local[*]}
+  executor_memory:      "4g"
+  driver_memory:        "2g"
+  shuffle_partitions:   200
+  adaptive_execution:   true
+  delta_enabled:        true
+  log_level:            "WARN"
+
+# ─────────────────────────────────────────────────────────────
+# API
+# ─────────────────────────────────────────────────────────────
+api:
+  host:             "0.0.0.0"
+  port:             8000
+  workers:          4
+  cache_ttl_seconds: 60
+  cors_origins:     ["*"]
+
+# ─────────────────────────────────────────────────────────────
+# Logging (structured JSON — ELK / Datadog compatible)
+# ─────────────────────────────────────────────────────────────
+logging:
+  level:      ${LOG_LEVEL:INFO}
+  format:     "{time:YYYY-MM-DD HH:mm:ss} | {level} | {name}:{line} | {message}"
+  rotation:   "100 MB"
+  retention:  "30 days"

@@ -1,0 +1,415 @@
+// ============================================================
+// EQUITY MARKET ANALYSIS DASHBOARD — DAX MEASURES
+// Power BI Desktop | Compatible with: DAX 2024+
+// ============================================================
+// Data model tables:
+//   OHLCV          — ticker, date, open, high, low, close, volume, sector, daily_return
+//   Fundamentals   — ticker, name, sector, sub_industry, beta, market_cap_cat, weight_pct
+//   Dates          — date, year, quarter, month, week, is_trading_day  (mark as Date Table)
+//   Scenarios      — scenario_name, mkt_return_shock, vol_multiplier   (static reference)
+// ============================================================
+
+
+// ─────────────────────────────────────────────────────────────
+// CORE RETURN MEASURES
+// ─────────────────────────────────────────────────────────────
+
+Daily Return =
+AVERAGE ( OHLCV[daily_return] )
+
+Daily Return % =
+FORMAT ( [Daily Return], "0.00%" )
+
+Latest Close =
+CALCULATE (
+    LASTNONBLANK ( OHLCV[close], 1 ),
+    ALLSELECTED ( OHLCV[date] )
+)
+
+1D Return =
+VAR _latest =
+    CALCULATE ( MAX ( OHLCV[date] ), ALLSELECTED () )
+VAR _prev =
+    CALCULATE (
+        MAX ( OHLCV[date] ),
+        ALLSELECTED (),
+        OHLCV[date] < _latest
+    )
+VAR _c_today =
+    CALCULATE ( AVERAGE ( OHLCV[close] ), OHLCV[date] = _latest )
+VAR _c_prev  =
+    CALCULATE ( AVERAGE ( OHLCV[close] ), OHLCV[date] = _prev )
+RETURN
+    DIVIDE ( _c_today - _c_prev, _c_prev )
+
+5D Return =
+VAR _latest =
+    CALCULATE ( MAX ( OHLCV[date] ), ALLSELECTED () )
+VAR _start =
+    _latest - 7
+VAR _c_start =
+    CALCULATE (
+        FIRSTNONBLANK ( OHLCV[close], 1 ),
+        OHLCV[date] >= _start && OHLCV[date] <= _latest
+    )
+VAR _c_end =
+    CALCULATE ( LASTNONBLANK ( OHLCV[close], 1 ), OHLCV[date] <= _latest )
+RETURN
+    DIVIDE ( _c_end - _c_start, _c_start )
+
+1M Return =
+VAR _end   = CALCULATE ( MAX ( OHLCV[date] ), ALLSELECTED () )
+VAR _start = EDATE ( _end, -1 )
+VAR _c1 = CALCULATE ( AVERAGE ( OHLCV[close] ), OHLCV[date] <= _start )
+VAR _c2 = CALCULATE ( AVERAGE ( OHLCV[close] ), OHLCV[date] <= _end   )
+RETURN DIVIDE ( _c2 - _c1, _c1 )
+
+3M Return =
+VAR _end   = CALCULATE ( MAX ( OHLCV[date] ), ALLSELECTED () )
+VAR _start = EDATE ( _end, -3 )
+VAR _c1 = CALCULATE ( AVERAGE ( OHLCV[close] ), OHLCV[date] <= _start )
+VAR _c2 = CALCULATE ( AVERAGE ( OHLCV[close] ), OHLCV[date] <= _end   )
+RETURN DIVIDE ( _c2 - _c1, _c1 )
+
+6M Return =
+VAR _end   = CALCULATE ( MAX ( OHLCV[date] ), ALLSELECTED () )
+VAR _start = EDATE ( _end, -6 )
+VAR _c1 = CALCULATE ( AVERAGE ( OHLCV[close] ), OHLCV[date] <= _start )
+VAR _c2 = CALCULATE ( AVERAGE ( OHLCV[close] ), OHLCV[date] <= _end   )
+RETURN DIVIDE ( _c2 - _c1, _c1 )
+
+1Y Return =
+VAR _end   = CALCULATE ( MAX ( OHLCV[date] ), ALLSELECTED () )
+VAR _start = DATE ( YEAR ( _end ) - 1, MONTH ( _end ), DAY ( _end ) )
+VAR _c1 = CALCULATE ( AVERAGE ( OHLCV[close] ), OHLCV[date] <= _start )
+VAR _c2 = CALCULATE ( AVERAGE ( OHLCV[close] ), OHLCV[date] <= _end   )
+RETURN DIVIDE ( _c2 - _c1, _c1 )
+
+3Y Return (Annualised) =
+VAR _end   = CALCULATE ( MAX ( OHLCV[date] ), ALLSELECTED () )
+VAR _start = DATE ( YEAR ( _end ) - 3, MONTH ( _end ), DAY ( _end ) )
+VAR _c1 = CALCULATE ( AVERAGE ( OHLCV[close] ), OHLCV[date] <= _start )
+VAR _c2 = CALCULATE ( AVERAGE ( OHLCV[close] ), OHLCV[date] <= _end   )
+VAR _total = DIVIDE ( _c2 - _c1, _c1 )
+RETURN
+    POWER ( 1 + _total, 1/3 ) - 1
+
+5Y Return (Annualised) =
+VAR _end   = CALCULATE ( MAX ( OHLCV[date] ), ALLSELECTED () )
+VAR _start = DATE ( YEAR ( _end ) - 5, MONTH ( _end ), DAY ( _end ) )
+VAR _c1 = CALCULATE ( AVERAGE ( OHLCV[close] ), OHLCV[date] <= _start )
+VAR _c2 = CALCULATE ( AVERAGE ( OHLCV[close] ), OHLCV[date] <= _end   )
+VAR _total = DIVIDE ( _c2 - _c1, _c1 )
+RETURN
+    POWER ( 1 + _total, 1/5 ) - 1
+
+10Y Return (Annualised) =
+VAR _end   = CALCULATE ( MAX ( OHLCV[date] ), ALLSELECTED () )
+VAR _start = DATE ( YEAR ( _end ) - 10, MONTH ( _end ), DAY ( _end ) )
+VAR _c1 = CALCULATE ( AVERAGE ( OHLCV[close] ), OHLCV[date] <= _start )
+VAR _c2 = CALCULATE ( AVERAGE ( OHLCV[close] ), OHLCV[date] <= _end   )
+VAR _total = DIVIDE ( _c2 - _c1, _c1 )
+RETURN
+    POWER ( 1 + _total, 1/10 ) - 1
+
+20Y Return (Annualised) =
+VAR _end   = CALCULATE ( MAX ( OHLCV[date] ), ALLSELECTED () )
+VAR _start = DATE ( YEAR ( _end ) - 20, MONTH ( _end ), DAY ( _end ) )
+VAR _c1 = CALCULATE ( AVERAGE ( OHLCV[close] ), OHLCV[date] <= _start )
+VAR _c2 = CALCULATE ( AVERAGE ( OHLCV[close] ), OHLCV[date] <= _end   )
+VAR _total = DIVIDE ( _c2 - _c1, _c1 )
+RETURN
+    POWER ( 1 + _total, 1/20 ) - 1
+
+
+// ─────────────────────────────────────────────────────────────
+// RISK MEASURES
+// ─────────────────────────────────────────────────────────────
+
+Annualised Return =
+AVERAGE ( OHLCV[daily_return] ) * 252
+
+Annualised Volatility =
+VAR _stddev = STDEVX.P ( ALLSELECTED ( OHLCV ), OHLCV[daily_return] )
+RETURN _stddev * SQRT ( 252 )
+
+Sharpe Ratio =
+VAR _rfr    = 0.05      // Risk-free rate (update as needed)
+VAR _ret    = [Annualised Return]
+VAR _vol    = [Annualised Volatility]
+RETURN
+    DIVIDE ( _ret - _rfr, _vol )
+
+Sortino Ratio =
+VAR _rfr    = 0.05
+VAR _ret    = [Annualised Return]
+VAR _down   = STDEVX.P (
+                FILTER ( ALLSELECTED ( OHLCV ), OHLCV[daily_return] < 0 ),
+                OHLCV[daily_return]
+              ) * SQRT ( 252 )
+RETURN
+    DIVIDE ( _ret - _rfr, _down )
+
+VaR 95% (1D) =
+VAR _sorted =
+    PERCENTILEX.INC (
+        ALLSELECTED ( OHLCV ),
+        OHLCV[daily_return],
+        0.05
+    )
+RETURN _sorted
+
+VaR 99% (1D) =
+PERCENTILEX.INC ( ALLSELECTED ( OHLCV ), OHLCV[daily_return], 0.01 )
+
+CVaR 95% (Expected Shortfall) =
+VAR _var95 = [VaR 95% (1D)]
+RETURN
+    AVERAGEX (
+        FILTER ( ALLSELECTED ( OHLCV ), OHLCV[daily_return] <= _var95 ),
+        OHLCV[daily_return]
+    )
+
+Max Drawdown =
+VAR _table =
+    ADDCOLUMNS (
+        ALLSELECTED ( OHLCV[date] ),
+        "_cum",  CALCULATE (
+                     SUMX ( ALLSELECTED ( OHLCV ), LN ( 1 + OHLCV[daily_return] ) ),
+                     FILTER ( ALLSELECTED ( OHLCV ), OHLCV[date] <= EARLIER ( OHLCV[date] ) )
+                 )
+    )
+VAR _peak = MAXX ( _table, [_cum] )
+VAR _dd   = MINX ( _table, [_cum] - _peak )
+RETURN _dd
+
+Win Rate =
+DIVIDE (
+    COUNTROWS ( FILTER ( ALLSELECTED ( OHLCV ), OHLCV[daily_return] > 0 ) ),
+    COUNTROWS ( FILTER ( ALLSELECTED ( OHLCV ), OHLCV[daily_return] <> BLANK () ) )
+)
+
+Average Beta =
+AVERAGEX ( VALUES ( Fundamentals[ticker] ), RELATED ( Fundamentals[beta] ) )
+
+Calmar Ratio =
+VAR _ann_ret = [Annualised Return]
+VAR _mdd     = ABS ( [Max Drawdown] )
+RETURN DIVIDE ( _ann_ret, _mdd )
+
+// ─────────────────────────────────────────────────────────────
+// MARKET BREADTH
+// ─────────────────────────────────────────────────────────────
+
+Market Breadth (% Advancing) =
+VAR _today =
+    CALCULATE ( MAX ( OHLCV[date] ), ALLSELECTED () )
+RETURN
+    DIVIDE (
+        COUNTROWS ( FILTER ( ALLSELECTED ( OHLCV ), OHLCV[date] = _today && OHLCV[daily_return] > 0 ) ),
+        COUNTROWS ( FILTER ( ALLSELECTED ( OHLCV ), OHLCV[date] = _today && OHLCV[daily_return] <> BLANK () ) )
+    )
+
+# Advancing Today =
+VAR _today = CALCULATE ( MAX ( OHLCV[date] ), ALLSELECTED () )
+RETURN
+    COUNTROWS ( FILTER ( ALLSELECTED ( OHLCV ), OHLCV[date] = _today && OHLCV[daily_return] > 0 ) )
+
+# Declining Today =
+VAR _today = CALCULATE ( MAX ( OHLCV[date] ), ALLSELECTED () )
+RETURN
+    COUNTROWS ( FILTER ( ALLSELECTED ( OHLCV ), OHLCV[date] = _today && OHLCV[daily_return] < 0 ) )
+
+New 52W Highs =
+VAR _today  = CALCULATE ( MAX ( OHLCV[date] ), ALLSELECTED () )
+VAR _52wago = _today - 365
+RETURN
+    COUNTROWS (
+        FILTER (
+            ADDCOLUMNS (
+                VALUES ( OHLCV[ticker] ),
+                "_close_today", CALCULATE ( MAX ( OHLCV[close] ), OHLCV[date] = _today ),
+                "_high_52w",    CALCULATE ( MAX ( OHLCV[high] ), OHLCV[date] >= _52wago && OHLCV[date] < _today )
+            ),
+            [_close_today] >= [_high_52w]
+        )
+    )
+
+// ─────────────────────────────────────────────────────────────
+// SCENARIO ANALYSIS
+// ─────────────────────────────────────────────────────────────
+
+// These measures reference the Scenarios table (static):
+//   scenario_name | mkt_return_shock | vol_multiplier
+//   Bull          |  0.25            | 0.75
+//   Base          |  0.08            | 1.00
+//   Bear          | -0.30            | 1.80
+
+Scenario Portfolio Return =
+VAR _rfr = 0.05
+VAR _avg_beta = [Average Beta]
+VAR _mkt_shock =
+    SELECTEDVALUE ( Scenarios[mkt_return_shock], 0.08 )
+RETURN
+    _rfr + _avg_beta * ( _mkt_shock - _rfr )
+
+Scenario Portfolio Vol =
+VAR _base_vol    = [Annualised Volatility]
+VAR _vol_mult    = SELECTEDVALUE ( Scenarios[vol_multiplier], 1.0 )
+RETURN _base_vol * _vol_mult
+
+Scenario Sharpe =
+VAR _rfr = 0.05
+RETURN
+    DIVIDE ( [Scenario Portfolio Return] - _rfr, [Scenario Portfolio Vol] )
+
+Scenario VaR 95% (1D) =
+VAR _base_vol  = STDEVX.P ( ALLSELECTED ( OHLCV ), OHLCV[daily_return] )
+VAR _vol_mult  = SELECTEDVALUE ( Scenarios[vol_multiplier], 1.0 )
+VAR _adj_vol   = _base_vol * _vol_mult
+VAR _avg_daily = AVERAGE ( OHLCV[daily_return] )
+RETURN
+    _avg_daily - 1.6449 * _adj_vol    // z = 1.6449 for 95% confidence
+
+Scenario Max Drawdown (Estimate) =
+VAR _ann_vol = [Scenario Portfolio Vol]
+// Approximate: MDD ~ -2 * annual volatility for 1Y horizon
+RETURN - 2 * _ann_vol
+
+// ─────────────────────────────────────────────────────────────
+// SECTOR ANALYTICS
+// ─────────────────────────────────────────────────────────────
+
+Sector Avg Return (1Y) =
+AVERAGEX (
+    VALUES ( OHLCV[ticker] ),
+    CALCULATE ( [1Y Return] )
+)
+
+Sector Sharpe =
+VAR _rfr = 0.05
+RETURN
+    DIVIDE (
+        [Sector Avg Return (1Y)] - _rfr,
+        STDEVX.P ( ALLSELECTED ( OHLCV ), OHLCV[daily_return] ) * SQRT ( 252 )
+    )
+
+Sector Market Cap Weight =
+SUMX (
+    VALUES ( Fundamentals[ticker] ),
+    RELATED ( Fundamentals[weight_pct] )
+)
+
+Sector Sharpe Contribution =
+[Sector Sharpe] * DIVIDE ( [Sector Market Cap Weight], 100 )
+
+// ─────────────────────────────────────────────────────────────
+// VOLUME
+// ─────────────────────────────────────────────────────────────
+
+Total Volume =
+SUM ( OHLCV[volume] )
+
+Avg Daily Volume =
+AVERAGEX ( VALUES ( OHLCV[date] ), [Total Volume] )
+
+Volume Ratio (vs 20D Avg) =
+VAR _today_vol =
+    CALCULATE (
+        SUM ( OHLCV[volume] ),
+        OHLCV[date] = CALCULATE ( MAX ( OHLCV[date] ), ALLSELECTED () )
+    )
+VAR _20d_avg =
+    AVERAGEX (
+        TOPN (
+            20,
+            FILTER ( ALLSELECTED ( OHLCV ), OHLCV[date] < CALCULATE ( MAX ( OHLCV[date] ), ALLSELECTED () ) ),
+            OHLCV[date], DESC
+        ),
+        OHLCV[volume]
+    )
+RETURN DIVIDE ( _today_vol, _20d_avg )
+
+// ─────────────────────────────────────────────────────────────
+// DISPLAY / FORMATTING HELPERS
+// ─────────────────────────────────────────────────────────────
+
+Return Color (Conditional) =
+IF ( [1Y Return] >= 0, "#10B981", "#EF4444" )
+
+Signal Label =
+VAR _ret = [1Y Return]
+VAR _rsi = [RSI 14]         // requires RSI measure defined in feature table
+RETURN
+    SWITCH (
+        TRUE (),
+        _ret > 0.20 && _rsi < 65,  "Strong Buy",
+        _ret > 0.05 && _rsi < 70,  "Buy",
+        _ret > -0.05,               "Hold",
+        _ret > -0.20,               "Sell",
+        "Strong Sell"
+    )
+
+Volatility Regime =
+VAR _vol = [Annualised Volatility]
+RETURN
+    SWITCH (
+        TRUE (),
+        _vol > 0.35, "High Volatility",
+        _vol > 0.20, "Normal",
+        "Low Volatility"
+    )
+
+// ─────────────────────────────────────────────────────────────
+// ROLLING METRICS (requires row-level date context)
+// ─────────────────────────────────────────────────────────────
+
+Rolling 252D Sharpe =
+VAR _rfr = 0.05
+VAR _today = MAX ( OHLCV[date] )
+VAR _start = _today - 365
+VAR _ret_252 =
+    CALCULATE (
+        AVERAGE ( OHLCV[daily_return] ) * 252,
+        OHLCV[date] >= _start && OHLCV[date] <= _today
+    )
+VAR _vol_252 =
+    CALCULATE (
+        STDEVX.P ( OHLCV, OHLCV[daily_return] ) * SQRT ( 252 ),
+        OHLCV[date] >= _start && OHLCV[date] <= _today
+    )
+RETURN
+    DIVIDE ( _ret_252 - _rfr, _vol_252 )
+
+Rolling 60D Vol =
+VAR _today = MAX ( OHLCV[date] )
+VAR _start = _today - 90
+RETURN
+    CALCULATE (
+        STDEVX.P ( OHLCV, OHLCV[daily_return] ) * SQRT ( 252 ),
+        OHLCV[date] >= _start && OHLCV[date] <= _today
+    )
+
+// ─────────────────────────────────────────────────────────────
+// RSI (14-day) — calculated column or Python visual
+// ─────────────────────────────────────────────────────────────
+// Note: RSI requires ordered row-by-row context.
+// Recommended: calculate in PySpark (Feature Engineering notebook)
+// and import into Power BI as a column in the OHLCV table.
+//
+// RSI DAX approximation (use only for single-ticker selection):
+RSI 14 =
+VAR _today = MAX ( OHLCV[date] )
+VAR _start = _today - 21
+VAR _gains =
+    AVERAGEX (
+        FILTER ( OHLCV, OHLCV[date] >= _start && OHLCV[daily_return] > 0 ),
+        OHLCV[daily_return]
+    )
+VAR _losses =
+    ABS ( AVERAGEX (
+        FILTER ( OHLCV, OHLCV[date] >= _start && OHLCV[daily_return] < 0 ),
+        OHLCV[daily_return]
+    ) )
+VAR _rs = DIVIDE ( _gains, _losses + 0.000001 )
+RETURN 100 - DIVIDE ( 100, 1 + _rs )

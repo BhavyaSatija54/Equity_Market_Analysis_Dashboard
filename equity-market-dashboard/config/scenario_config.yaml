@@ -1,0 +1,179 @@
+# config/scenario_config.yaml
+# ─────────────────────────────────────────────────────────────
+# Market Regime / Scenario Engine Configuration
+# Used by: src/analytics/scenario_analysis.py
+#          notebooks/03_market_scenario_analysis.py
+# ─────────────────────────────────────────────────────────────
+
+# Priority order matters: higher priority wins when multiple
+# conditions trigger simultaneously.
+# Resolution order: Bear > Volatile > Bull > Recovery > Normal
+
+regimes:
+
+  bear:
+    label: "Bear"
+    priority: 1
+    description: "Sustained risk-off with broad equity drawdowns"
+    conditions:
+      spx_drawdown_pct:   { op: "<=", threshold: -0.20 }   # SPX ≥20% off peak
+      vix_level:          { op: ">=", threshold: 30.0  }   # Elevated fear gauge
+      momentum_20d:       { op: "<=", threshold: -0.05 }   # Negative short-term momentum
+    shocks:
+      market_return:      -0.30
+      volatility_multiplier: 1.80
+      correlation_shift:  +0.35    # Correlations spike in crises
+    sector_sensitivity:   # How much each sector amplifies the shock
+      Technology:         1.40
+      Financials:         1.20
+      Healthcare:         0.70
+      "Cons Disc":        1.30
+      "Comm Services":    1.10
+      Industrials:        1.05
+      "Cons Staples":     0.45
+      Energy:             1.10
+      "Real Estate":      1.15
+      Materials:          1.00
+      Utilities:          0.35
+
+  volatile:
+    label: "Volatile"
+    priority: 2
+    description: "High cross-sectional dispersion, elevated VIX, no clear trend"
+    conditions:
+      vix_level:          { op: ">=", threshold: 25.0  }
+      spx_drawdown_pct:   { op: ">=", threshold: -0.20 }   # Not yet a bear
+      realized_vol_20d:   { op: ">=", threshold: 0.22  }   # Cross-sec vol elevated
+    shocks:
+      market_return:      -0.05
+      volatility_multiplier: 1.40
+      correlation_shift:  +0.20
+    sector_sensitivity:
+      Technology:         1.30
+      Financials:         1.10
+      Healthcare:         0.80
+      "Cons Disc":        1.20
+      "Comm Services":    1.05
+      Industrials:        1.00
+      "Cons Staples":     0.55
+      Energy:             1.15
+      "Real Estate":      1.00
+      Materials:          1.05
+      Utilities:          0.40
+
+  bull:
+    label: "Bull"
+    priority: 3
+    description: "Risk-on, broad equity advance, suppressed volatility"
+    conditions:
+      spx_drawdown_pct:   { op: ">=", threshold: -0.05 }   # Near all-time highs
+      vix_level:          { op: "<=", threshold: 18.0  }
+      momentum_20d:       { op: ">=", threshold: 0.03  }   # Positive momentum
+    shocks:
+      market_return:      +0.25
+      volatility_multiplier: 0.75
+      correlation_shift:  -0.10    # Correlations fall in risk-on
+    sector_sensitivity:
+      Technology:         1.30
+      Financials:         1.15
+      Healthcare:         0.85
+      "Cons Disc":        1.20
+      "Comm Services":    1.05
+      Industrials:        1.10
+      "Cons Staples":     0.60
+      Energy:             1.25
+      "Real Estate":      0.90
+      Materials:          1.10
+      Utilities:          0.40
+
+  recovery:
+    label: "Recovery"
+    priority: 4
+    description: "Post-drawdown mean reversion, improving breadth"
+    conditions:
+      spx_drawdown_pct:   { op: ">=", threshold: -0.20 }   # Off the lows
+      momentum_20d:       { op: ">=", threshold: 0.01  }   # Turning positive
+      vix_level:          { op: "<=", threshold: 28.0  }
+    shocks:
+      market_return:      +0.12
+      volatility_multiplier: 1.10
+      correlation_shift:  0.00
+    sector_sensitivity:
+      Technology:         1.10
+      Financials:         1.20    # Financials lead recoveries
+      Healthcare:         0.90
+      "Cons Disc":        1.15
+      "Comm Services":    1.00
+      Industrials:        1.15
+      "Cons Staples":     0.70
+      Energy:             1.10
+      "Real Estate":      1.05
+      Materials:          1.10
+      Utilities:          0.55
+
+  normal:
+    label: "Normal"
+    priority: 5                    # Catch-all — always matches
+    description: "Trend-growth, no macro dislocations"
+    conditions: {}                 # No conditions — default regime
+    shocks:
+      market_return:      +0.08
+      volatility_multiplier: 1.00
+      correlation_shift:  0.00
+    sector_sensitivity:
+      Technology:         1.00
+      Financials:         1.00
+      Healthcare:         0.90
+      "Cons Disc":        1.00
+      "Comm Services":    0.95
+      Industrials:        1.00
+      "Cons Staples":     0.80
+      Energy:             0.95
+      "Real Estate":      0.85
+      Materials:          0.95
+      Utilities:          0.70
+
+# ─────────────────────────────────────────────────────────────
+# Additional stress scenarios (not regime-classified,
+# used by the Scenario Engine for forward-looking stress tests)
+# ─────────────────────────────────────────────────────────────
+
+stress_scenarios:
+
+  stagflation:
+    label: "Stagflation"
+    description: "High inflation + low growth; value over growth"
+    shocks:
+      market_return:      -0.15
+      volatility_multiplier: 1.40
+      correlation_shift:  +0.20
+      rate_shock_bps:     +200
+
+  rate_shock:
+    label: "Rate Shock"
+    description: "+200bps rapid rate rise; duration-sensitive sectors hit"
+    shocks:
+      market_return:      -0.10
+      volatility_multiplier: 1.30
+      correlation_shift:  +0.15
+      rate_shock_bps:     +200
+
+  liquidity_crisis:
+    label: "Liquidity Crisis"
+    description: "Credit freeze, bid-ask spreads spike, forced deleveraging"
+    shocks:
+      market_return:      -0.40
+      volatility_multiplier: 2.50
+      correlation_shift:  +0.50
+      rate_shock_bps:     -100    # Flight to safety
+
+# ─────────────────────────────────────────────────────────────
+# Regime signal thresholds (tunable)
+# ─────────────────────────────────────────────────────────────
+
+signal_params:
+  vix_window_days:        20      # Rolling window for VIX smoothing
+  momentum_window_days:   20      # Lookback for momentum signal
+  vol_window_days:        20      # Lookback for realised vol
+  drawdown_lookback_days: 252     # Peak lookback for drawdown calc
+  risk_free_rate:         0.05    # Annual, used in Sharpe/Sortino
