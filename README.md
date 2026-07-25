@@ -54,7 +54,7 @@ Production-grade equity analysis pipeline implementing a **full medallion archit
 │  • DirectQuery-ready fact tables (year/quarter partitioned)     │
 │  • Import-mode dimensions (CSV + Parquet)                        │
 │  • Semantic model JSON + DAX measure library (30+ measures)      │
-│  • Companion web dashboard (5 pages, D3.js + Chart.js)          │
+│  • Companion web dashboard (5 pages)          │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
