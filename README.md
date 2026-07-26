@@ -10,35 +10,35 @@ Production-grade equity analysis pipeline implementing a **full medallion archit
 > 6 KPI cards · 20-Year S&P 500 chart (Price / Cum. Return / Drawdown) · Sector Treemap · Top/Bottom performers · Market breadth panel
 > **Sector and Cap filters update all panels in real time.**
 
-![Market Intelligence](docs/assets/page1_market_intelligence.png)
+<img width="1280" height="723" alt="Screenshot 2026-07-26 at 5 23 16 PM" src="https://github.com/user-attachments/assets/246fe436-f614-4263-90c7-8f876ae1aeb0" />
 
 ---
 
 ### Page 2 — Equity Screener
 > 503-stock sortable table · Return vs. Volatility bubble chart · Beta distribution · Signal mix · Multi-axis filters
 
-![Equity Screener](docs/assets/page2_screener.png)
+<img width="1280" height="722" alt="Screenshot 2026-07-26 at 5 23 06 PM" src="https://github.com/user-attachments/assets/0eedc3e2-6bb4-49de-964e-e7ee1fdce5f8" />
 
 ---
 
 ### Page 3 — Risk Analytics
 > Underwater drawdown chart · Rolling 252D Sharpe · Sector VaR/CVaR · 11×11 sector correlation heatmap · Risk gauges
 
-![Risk Analytics](docs/assets/page3_risk.png)
+<img width="1280" height="722" alt="Screenshot 2026-07-26 at 5 32 19 PM" src="https://github.com/user-attachments/assets/256230fa-ce03-46e2-ace4-9937b64b998b" />
 
 ---
 
 ### Page 4 — Scenario Engine
 > Bull / Base / Bear / Stagflation / Rate Shock cards · Sector P&L waterfall · Return distribution overlay · Summary table
 
-![Scenario Engine](docs/assets/page4_scenario.png)
+<img width="1600" height="960" alt="page4_scenario" src="https://github.com/user-attachments/assets/a95ccca6-863d-40be-bb06-d08efdfc271f" />
 
 ---
 
 ### Page 5 — Sector Rotation (RRG)
 > Relative Rotation Graph (4 quadrants) · Monthly return heatmap · Sector momentum ranking
 
-![Sector Rotation](docs/assets/page5_rotation.png)
+<img width="1600" height="960" alt="page5_rotation" src="https://github.com/user-attachments/assets/495e041c-1f2b-410e-8da9-9e515a6d1c26" />
 
 ---
 
@@ -92,7 +92,7 @@ Production-grade equity analysis pipeline implementing a **full medallion archit
 │  • DirectQuery-ready fact tables (year/quarter partitioned)     │
 │  • Import-mode dimensions (CSV + Parquet)                        │
 │  • Semantic model JSON + DAX measure library (30+ measures)      │
-│  • Companion web dashboard (5 pages, D3.js + Chart.js)          │
+│  • Companion web dashboard (5 pages)          │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
