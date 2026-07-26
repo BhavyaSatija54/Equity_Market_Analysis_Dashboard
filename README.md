@@ -1,6 +1,44 @@
 # Equity Market Analytics Platform
 
-Production-grade equity analysis pipeline implementing a **full medallion architecture (Bronze → Silver → Gold)** for 503 S&P 500 equities across 20 years of real Yahoo Finance data. Processed via PySpark/SparkSQL on Databricks, surfaced in an interactive Power BI report and a companion web dashboard.
+Production-grade equity analysis pipeline implementing a **full medallion architecture (Bronze → Silver → Gold)** for 503 S&P 500 equities across 20 years of real Yahoo Finance data. Processed via PySpark/SparkSQL on Databricks, surfaced in a 5-page Power BI report and a companion web dashboard.
+
+---
+
+## Dashboard Preview
+
+### Page 1 — Market Intelligence
+> 6 KPI cards · 20-Year S&P 500 chart (Price / Cum. Return / Drawdown) · Sector Treemap · Top/Bottom performers · Market breadth panel
+> **Sector and Cap filters update all panels in real time.**
+
+![Market Intelligence](docs/assets/page1_market_intelligence.png)
+
+---
+
+### Page 2 — Equity Screener
+> 503-stock sortable table · Return vs. Volatility bubble chart · Beta distribution · Signal mix · Multi-axis filters
+
+![Equity Screener](docs/assets/page2_screener.png)
+
+---
+
+### Page 3 — Risk Analytics
+> Underwater drawdown chart · Rolling 252D Sharpe · Sector VaR/CVaR · 11×11 sector correlation heatmap · Risk gauges
+
+![Risk Analytics](docs/assets/page3_risk.png)
+
+---
+
+### Page 4 — Scenario Engine
+> Bull / Base / Bear / Stagflation / Rate Shock cards · Sector P&L waterfall · Return distribution overlay · Summary table
+
+![Scenario Engine](docs/assets/page4_scenario.png)
+
+---
+
+### Page 5 — Sector Rotation (RRG)
+> Relative Rotation Graph (4 quadrants) · Monthly return heatmap · Sector momentum ranking
+
+![Sector Rotation](docs/assets/page5_rotation.png)
 
 ---
 
@@ -54,7 +92,7 @@ Production-grade equity analysis pipeline implementing a **full medallion archit
 │  • DirectQuery-ready fact tables (year/quarter partitioned)     │
 │  • Import-mode dimensions (CSV + Parquet)                        │
 │  • Semantic model JSON + DAX measure library (30+ measures)      │
-│  • Companion web dashboard (5 pages)          │
+│  • Companion web dashboard (5 pages, D3.js + Chart.js)          │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -64,7 +102,7 @@ Production-grade equity analysis pipeline implementing a **full medallion archit
 
 ```
 equity-market-dashboard/
-├── main.py                         # Production entry point
+├── main.py                         # Production entry point (Bronze→Gold→Export)
 ├── config/
 │   ├── pipeline_config.yaml        # Medallion paths, DQ thresholds, Spark config
 │   └── scenario_config.yaml        # Market regime definitions (Bull/Bear/etc.)
@@ -76,7 +114,6 @@ equity-market-dashboard/
 │   │   ├── transformation.py       # PySpark feature engineering (Silver layer)
 │   │   └── spark_jobs.py           # SparkSQL analytics jobs (Gold layer)
 │   ├── analytics/
-│   │   ├── market_analysis.py
 │   │   ├── portfolio_metrics.py    # Sharpe, Sortino, VaR, CVaR, MDD, Calmar
 │   │   └── scenario_analysis.py   # Bull/Bear/Volatile/Recovery/Normal engine
 │   ├── reporting/
@@ -93,7 +130,7 @@ equity-market-dashboard/
 ├── data/
 │   ├── sp500_universe.py           # 503 S&P 500 constituents
 │   ├── yahoo_fetcher.py            # yfinance 20Y downloader
-│   └── powerbi_export.py          # generates Power BI-ready CSVs (legacy)
+│   └── sample_generator.py
 ├── powerbi/
 │   ├── README.md                   # Full Power BI setup guide
 │   ├── dax_measures.dax            # 30+ DAX measures
@@ -101,14 +138,15 @@ equity-market-dashboard/
 ├── notebooks/                      # Databricks-ready notebooks
 │   ├── 01_data_ingestion.py        # Bronze layer
 │   ├── 02_feature_engineering.py   # Silver layer
-│   ├── 03_market_scenario_analysis.py  # Analytics + Gold layer
-│   └── 04_investment_analytics_reporting.py  # Gold agg + Export
+│   ├── 03_market_scenario_analysis.py
+│   └── 04_investment_analytics_reporting.py
 ├── dashboard/
-│   └── index.html                  # 5-page web dashboard (standalone)
+│   └── index.html                  # 5-page standalone web dashboard
+├── docs/assets/                    # Page screenshots (SVG)
 ├── tests/
 │   ├── test_analytics.py           # 35 passing unit tests
 │   └── test_pipeline.py
-├── .github/workflows/ci.yml        # GitHub Actions CI
+├── .github/workflows/ci.yml
 ├── Dockerfile
 ├── docker-compose.yml
 └── requirements.txt
@@ -164,8 +202,7 @@ docker-compose up --build
 
 ## Data Quality Framework
 
-Every medallion layer runs `DataQualityEngine` before writing output.
-Configured in `config/pipeline_config.yaml` under `quality:`.
+Every medallion layer runs `DataQualityEngine` before writing. Configured in `config/pipeline_config.yaml`.
 
 | Check | Threshold | Action |
 |-------|-----------|--------|
@@ -186,23 +223,21 @@ Five market regimes, priority-resolved, defined in `config/scenario_config.yaml`
 
 | Regime | Priority | Trigger |
 |--------|----------|---------|
-| Bear | 1 (highest) | SPX drawdown ≤ −20%, VIX ≥ 30 |
+| Bear | 1 | SPX drawdown ≤ −20%, VIX ≥ 30 |
 | Volatile | 2 | VIX ≥ 25, realised vol ≥ 22% |
 | Bull | 3 | SPX near highs, VIX ≤ 18, momentum > 3% |
 | Recovery | 4 | Momentum turning positive post-drawdown |
 | Normal | 5 (default) | None of the above |
 
-Sector-level sensitivity multipliers and market shock parameters are all configurable per regime in the YAML.
-
 ---
 
 ## Pipeline Orchestration
 
-`src/orchestration/pipeline_dag.py` provides:
+`src/orchestration/pipeline_dag.py`:
 
 - **Topological sort** — stages run in dependency order
 - **Checkpointing** — completed stages write JSON markers; re-runs skip them
-- **Idempotent** — safe to re-run; use `--force` to recompute
+- **Idempotent** — safe to re-run; use `--force` to recompute all stages
 - **Circuit breaker** — critical stage failure aborts the DAG
 - **Structured metrics** — duration, records, DQ score per stage logged as JSON
 
@@ -211,34 +246,23 @@ Sector-level sensitivity multipliers and market shock parameters are all configu
 ## Databricks Setup
 
 1. Import notebooks from `notebooks/` into your Databricks workspace
-2. Create a cluster: Spark 3.4+ / DBR 13.x, 4+ workers
-3. Set cluster env vars:
-   ```
-   EQUITY_DATA_PATH=dbfs:/data/equities
-   BRONZE_PATH=dbfs:/data/bronze
-   SILVER_PATH=dbfs:/data/silver
-   GOLD_PATH=dbfs:/data/gold
-   ```
-4. Run notebooks in order: `01` → `02` → `03` → `04`
-5. Point Power BI DirectQuery connector at the Gold layer Delta tables
-
-**Scaling notes:**
-- Replace pandas with `pyspark.sql.DataFrame` in processing layers (see `src/data_pipeline/`)
-- Use Delta Lake (`delta_enabled: true` in config) for ACID transactions
-- Use Databricks Auto Loader for incremental Bronze ingestion
-- Use Unity Catalog for governance and lineage
+2. Cluster: Spark 3.4+ / DBR 13.x, 4+ workers
+3. Set env vars: `BRONZE_PATH`, `SILVER_PATH`, `GOLD_PATH` (DBFS paths)
+4. Run notebooks: `01` → `02` → `03` → `04`
+5. Point Power BI DirectQuery at the Gold layer Delta tables
 
 ---
 
 ## Power BI Integration
 
-See `powerbi/README.md` for the full 5-page report setup.
+See `powerbi/README.md` for the 5-page report setup.
 
-Key files:
-- `powerbi/dax_measures.dax` — 30+ DAX measures (returns, risk, scenarios, breadth)
-- `data/powerbi/fact_daily_metrics.parquet` — DirectQuery fact table (year/quarter partitioned)
-- `data/powerbi/dim_date.csv` — Date dimension (mark as Date Table)
-- `data/powerbi/semantic_model.json` — Auto-generated relationship spec
+| File | Purpose |
+|------|---------|
+| `powerbi/dax_measures.dax` | 30+ DAX measures (returns, risk, scenarios) |
+| `data/powerbi/fact_daily_metrics.parquet` | DirectQuery fact table (year/quarter partitioned) |
+| `data/powerbi/dim_date.csv` | Date dimension (mark as Date Table) |
+| `data/powerbi/semantic_model.json` | Auto-generated relationship spec |
 
 ---
 
@@ -249,11 +273,10 @@ Key files:
 | Tickers | 503 (full S&P 500) |
 | Date range | 2004–2024 (20Y daily) |
 | Total OHLCV rows | ~2.5M |
-| Pipeline runtime (local) | ~60–90s |
 | Pipeline runtime (4-node Databricks) | ~9 min |
 | vs Pandas single-machine | **~50% faster** |
 | Feature columns per equity | 35+ |
-| Unit tests | 35 passing |
+| Unit tests | **35 passing** |
 
 ---
 
